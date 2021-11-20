@@ -1,0 +1,420 @@
+################### Awareness NameSpace ###############
+
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: osambank
+
+################### Proxy Configuration ###############
+
+########## Proxy Service  #########
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: osambank
+  name: proxy
+  labels:
+    app: osambank-proxy
+spec:
+  ports:
+    - port: 443
+      targetPort: 443
+      nodePort: 31307
+  selector:
+    app: osambank-proxy
+    tier: osambank-proxy
+  type: LoadBalancer
+
+---
+########## Proxy Deployment #########
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: osambank
+  name: osambank-proxy
+  labels:
+    app: osambank-proxy
+    tier: osambank-proxy
+spec:
+  selector:
+    matchLabels:
+      app: osambank-proxy
+      tier: osambank-proxy
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: osambank-proxy
+        tier: osambank-proxy
+    spec:
+      containers:
+        - image: zisoft/awareness/proxy
+          imagePullPolicy: IfNotPresent
+          name: proxy
+          ports:
+            - containerPort: 443
+              name: proxy
+          volumeMounts:
+            - name: zisoft-proxy-httpd-hostpath
+              mountPath: /usr/local/apache2/conf/httpd.conf
+            - name: zisoft-proxy-index-hostpath
+              mountPath: /usr/local/apache2/htdocs/index.html
+            - name: zisoft-proxy-ssl-hostpath
+              mountPath: /usr/local/apache2/conf/extra/httpd-ssl.conf
+            - name: zisoft-proxy-crt-hostpath
+              mountPath: /usr/local/apache2/conf/server.crt
+            - name: zisoft-proxy-key-hostpath
+              mountPath: /usr/local/apache2/conf/server.key
+            - name: zisoft-proxy-chain-hostpath
+              mountPath: /usr/local/apache2/conf/server-ca.crt
+      volumes:
+        - name: zisoft-proxy-httpd-hostpath
+          hostPath:
+            path: /saas/apps/awareness/osambank/proxy/httpd.conf
+            type: File
+        - name: zisoft-proxy-index-hostpath
+          hostPath:
+            path: /saas/apps/awareness/osambank/proxy/index.html
+            type: File
+        - name: zisoft-proxy-ssl-hostpath
+          hostPath:
+            path: /saas/apps/awareness/osambank/proxy/httpd-ssl.conf
+            type: File
+        - name: zisoft-proxy-crt-hostpath
+          hostPath:
+            path: /saas/apps/awareness/osambank/ssl/server.crt
+            type: File
+        - name: zisoft-proxy-key-hostpath
+          hostPath:
+            path: /saas/apps/awareness/osambank/ssl/server.key
+            type: File
+        - name: zisoft-proxy-chain-hostpath
+          hostPath:
+            path: /saas/apps/awareness/osambank/ssl/server.chain.crt
+            type: File
+
+################### UI Configuration ###############
+---
+########## UI Service  #########
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: osambank
+  name: ui
+  labels:
+    app: osambank-ui
+spec:
+  ports:
+    - port: 80
+  selector:
+    app: osambank-ui
+    tier: osambank-ui
+  type: LoadBalancer
+
+---
+########## UI Deployment #########
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: osambank
+  name: osambank-ui
+  labels:
+    app: osambank-ui
+    tier: osambank-ui
+spec:
+  selector:
+    matchLabels:
+      app: osambank-ui
+      tier: osambank-ui
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: osambank-ui
+        tier: osambank-ui
+    spec:
+      containers:
+        - image: zisoft/awareness/ui
+          imagePullPolicy: IfNotPresent
+          name: ui
+          ports:
+            - containerPort: 80
+              name: osambank-ui
+          volumeMounts:
+            - name: zisoft-ui-httpd-hostpath
+              mountPath: /usr/local/apache2/conf/httpd.conf
+            - name: zisoft-ui-docs-hostpath
+              mountPath: /usr/local/apache2/htdocs/
+      volumes:
+        - name: zisoft-ui-httpd-hostpath
+          hostPath:
+            path: /saas/apps/awareness/osambank/ui/httpd.conf
+            type: File
+        - name: zisoft-ui-docs-hostpath
+          hostPath:
+            path: /saas/apps/awareness/osambank/ui/dist
+            type: DirectoryOrCreate
+
+################### web Configuration ###############
+
+---
+########## web Service  #########
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: osambank
+  name: web
+  labels:
+    app: osambank-web
+spec:
+  ports:
+    - port: 80
+  selector:
+    app: osambank-web
+    tier: osambank-web
+  type: LoadBalancer
+
+---
+########## web Deployment #########
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: osambank
+  name: osambank-web
+  labels:
+    app: osambank-web
+    tier: osambank-web
+spec:
+  selector:
+    matchLabels:
+      app: osambank-web
+      tier: osambank-web
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: osambank-web
+        tier: osambank-web
+    spec:
+      containers:
+        - image: zisoft/awareness/web
+          imagePullPolicy: IfNotPresent
+          lifecycle:
+            postStart:
+              exec:
+                command: ["/bin/sh", "-c", "php artisan config:cache"]
+          name: web
+          ports:
+            - containerPort: 80
+              name: osambank-web
+          volumeMounts:
+            - name: zisoft-web-hostpath
+              mountPath: /var/www/html/
+            - name: zisoft-web-httpd-hostpath
+              mountPath: /etc/httpd/conf/httpd.conf
+      volumes:
+        - name: zisoft-web-hostpath
+          hostPath:
+            path: /saas/apps/awareness/osambank/
+            type: DirectoryOrCreate
+        - name: zisoft-web-httpd-hostpath
+          hostPath:
+            path: /saas/apps/awareness/osambank/httpd.conf
+            type: File
+
+---
+################### worker Configuration ###############
+
+########## worker Service  #########
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: osambank
+  name: worker
+  labels:
+    app: osambank-worker
+spec:
+  ports:
+    - port: 80
+  selector:
+    app: osambank-worker
+    tier: osambank-worker
+  type: LoadBalancer
+
+---
+########## worker Deployment #########
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: osambank
+  name: osambank-worker
+  labels:
+    app: osambank-worker
+    tier: osambank-worker
+spec:
+  selector:
+    matchLabels:
+      app: osambank-worker
+      tier: osambank-worker
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: osambank-worker
+        tier: osambank-worker
+    spec:
+      containers:
+        - image: zisoft/awareness/worker
+          imagePullPolicy: IfNotPresent
+          name: worker
+          ports:
+            - containerPort: 80
+              name: osambank-worker
+          volumeMounts:
+            - name: zisoft-worker-hostpath
+              mountPath: /var/www/html/
+      volumes:
+        - name: zisoft-worker-hostpath
+          hostPath:
+            path: /saas/apps/awareness/osambank/
+            type: DirectoryOrCreate
+
+################### Metabase Configuration ###############
+---
+########## Metabase Service  #########
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: meta
+  namespace: osambank
+  labels:
+    app: osambank-meta
+spec:
+  ports:
+    - port: 3000
+  selector:
+    app: osambank-meta
+    tier: osambank-meta
+
+---
+########## Metabase Deployment #########
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: osambank-meta
+  namespace: osambank
+  labels:
+    app: osambank-meta
+    tier: osambank-meta
+spec:
+  selector:
+    matchLabels:
+      app: osambank-meta
+      tier: osambank-meta
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: osambank-meta
+        tier: osambank-meta
+    spec:
+      containers:
+        - image: zisoft/awareness/meta
+          imagePullPolicy: IfNotPresent
+          name: meta
+          env:
+            - name: MB_DB_FILE
+              value: /tmp/metabase.db
+          ports:
+            - containerPort: 3000
+              name: osambank-meta
+          volumeMounts:
+            - name: zisoft-metabase-hostpath
+              mountPath: /tmp
+      volumes:
+        - name: zisoft-metabase-hostpath
+          hostPath:
+            path: /saas/apps/awareness/osambank/metabase
+            type: DirectoryOrCreate
+
+################### Database Configuration ###############
+---
+########## Database Service  #########
+
+# kubernetes Zisoft DB Deployment + Service + Host path Storage
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: osambank
+  labels:
+    app: zisoft
+spec:
+  ports:
+    - port: 3306
+  selector:
+    app: osambank-db
+    tier: osambank-db
+
+---
+########## Database Deployment #########
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: osambank-db
+  namespace: osambank
+  labels:
+    app: osambank-db
+    tier: osambank-db
+spec:
+  selector:
+    matchLabels:
+      app: osambank-db
+      tier: osambank-db
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: osambank-db
+        tier: osambank-db
+    spec:
+      containers:
+        - image: zisoft/awareness/db
+          imagePullPolicy: IfNotPresent
+          name: db
+          env:
+            - name: MYSQL_USER
+              value: zisoft
+            - name: MYSQL_DATABASE
+              value: zisoft
+            - name: MYSQL_PASSWORD
+              value: Password1
+            - name: MYSQL_ROOT_PASSWORD
+              value: Password1
+          ports:
+            - containerPort: 3306
+              name: db
+          volumeMounts:
+            - name: zisoft-db-hostpath
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: zisoft-db-hostpath
+          hostPath:
+            path: /saas/apps/awareness/osambank/storage/database/
+            type: DirectoryOrCreate
+################### End of zisoft awareness yml file ###############
+
