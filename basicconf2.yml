@@ -1,0 +1,58 @@
+version: '3'
+services:
+  db:
+    image:  zisoft/awareness/db:latest
+    environment:
+      - MYSQL_USER=root
+      - MYSQL_DATABASE=zisoft
+      - MYSQL_PASSWORD=Password1
+      - MYSQL_ROOT_PASSWORD=Password1
+    ports:
+      - "33167:3306"
+    volumes:
+      - ./storage/database:/var/lib/mysql
+  web:
+    image:  zisoft/awareness/web:latest
+    volumes:
+      - "./:/var/www/html/"
+      - "./httpd.conf:/etc/httpd/conf/httpd.conf"
+        # - "./devops/php.ini:/etc/php.ini"
+  ui:
+    image:  zisoft/awareness/ui:latest
+    volumes:
+      - "./ui/httpd.conf:/usr/local/apache2/conf/httpd.conf"
+      - "./ui/dist:/usr/local/apache2/htdocs/"
+  worker:
+    image:  zisoft/awareness/worker:latest
+    volumes:
+      - "./:/var/www/html/"
+  meta:
+    image:   metabase/metabase:v0.40.3.1
+    environment:
+      - MB_DB_FILE=/tmp/metabase.db
+    volumes:
+      - ./metabase:/tmp
+  proxy:
+    image:  zisoft/awareness/proxy:latest
+    ports:
+      - "22000:80"
+      - "22001:443"
+    volumes:
+      - ./proxy/httpd.conf:/usr/local/apache2/conf/httpd.conf
+      - ./proxy/index.html:/usr/local/apache2/htdocs/index.html
+      - ./proxy/httpd-ssl.conf:/usr/local/apache2/conf/extra/httpd-ssl.conf
+      - ./ssl/server.crt:/usr/local/apache2/conf/server.crt
+      - ./ssl/server.key:/usr/local/apache2/conf/server.key
+      - ./ssl/server.chain.crt:/usr/local/apache2/conf/server-ca.crt
+  cron:
+    image: zisoft/awareness/cron:latest 
+  browser:
+    image: filebrowser/filebrowser:latest
+    ports:
+      - "8888:80"
+    volumes:
+      - Awareness/public/execute/pages:/srv
+      
+   
+
+
